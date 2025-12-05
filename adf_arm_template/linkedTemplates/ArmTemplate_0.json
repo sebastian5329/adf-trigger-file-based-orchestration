@@ -1,0 +1,721 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "type": "string",
+            "metadata": "Data Factory name",
+            "defaultValue": "cloud-dev-adf02"
+        },
+        "ls_sqldb_password": {
+            "type": "secureString",
+            "metadata": "Secure string for 'password' of 'ls_sqldb'"
+        },
+        "ls_adl_accountKey": {
+            "type": "secureString",
+            "metadata": "Secure string for 'accountKey' of 'ls_adl'"
+        },
+        "ls_blob_connectionString": {
+            "type": "secureString",
+            "metadata": "Secure string for 'connectionString' of 'ls_blob'"
+        },
+        "ls_sqldb_properties_typeProperties_server": {
+            "type": "string",
+            "defaultValue": "cloudsqlserver02.database.windows.net"
+        },
+        "ls_sqldb_properties_typeProperties_database": {
+            "type": "string",
+            "defaultValue": "cloudsqldb02"
+        },
+        "ls_sqldb_properties_typeProperties_userName": {
+            "type": "string",
+            "defaultValue": "sebastian"
+        },
+        "ls_adl_properties_typeProperties_url": {
+            "type": "string",
+            "defaultValue": "https://cloudadl02.dfs.core.windows.net/"
+        },
+        "tr_event_properties_typeProperties_scope": {
+            "type": "string",
+            "defaultValue": "/subscriptions/fc48e5ac-7507-4f71-8257-3a3665196b7b/resourceGroups/cloud-dev-dependancy/providers/Microsoft.Storage/storageAccounts/cloudblob02"
+        }
+    },
+    "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('factoryName'), '/ls_sqldb')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureSqlDatabase",
+                "typeProperties": {
+                    "server": "[parameters('ls_sqldb_properties_typeProperties_server')]",
+                    "database": "[parameters('ls_sqldb_properties_typeProperties_database')]",
+                    "encrypt": "mandatory",
+                    "trustServerCertificate": true,
+                    "authenticationType": "SQL",
+                    "userName": "[parameters('ls_sqldb_properties_typeProperties_userName')]",
+                    "password": {
+                        "type": "SecureString",
+                        "value": "[parameters('ls_sqldb_password')]"
+                    }
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/ls_adl')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBlobFS",
+                "typeProperties": {
+                    "url": "[parameters('ls_adl_properties_typeProperties_url')]",
+                    "accountKey": {
+                        "type": "SecureString",
+                        "value": "[parameters('ls_adl_accountKey')]"
+                    }
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/ls_blob')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBlobStorage",
+                "typeProperties": {
+                    "connectionString": "[parameters('ls_blob_connectionString')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/pl_fileAvailability')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "ForEach1",
+                        "type": "ForEach",
+                        "dependsOn": [],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@pipeline().parameters.pl_param_filelist",
+                                "type": "Expression"
+                            },
+                            "isSequential": true,
+                            "activities": [
+                                {
+                                    "name": "switch1",
+                                    "type": "Switch",
+                                    "dependsOn": [],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "on": {
+                                            "value": "@replace(item().name,'.','')",
+                                            "type": "Expression"
+                                        },
+                                        "cases": [
+                                            {
+                                                "value": "job2_completedcsv",
+                                                "activities": [
+                                                    {
+                                                        "name": "Append for file2",
+                                                        "description": "1",
+                                                        "type": "AppendVariable",
+                                                        "dependsOn": [],
+                                                        "userProperties": [],
+                                                        "typeProperties": {
+                                                            "variableName": "pl_var_counter",
+                                                            "value": "1"
+                                                        }
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "value": "job3_completedcsv",
+                                                "activities": [
+                                                    {
+                                                        "name": "Append for file3",
+                                                        "type": "AppendVariable",
+                                                        "dependsOn": [],
+                                                        "userProperties": [],
+                                                        "typeProperties": {
+                                                            "variableName": "pl_var_counter",
+                                                            "value": "1"
+                                                        }
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "value": "job1_completedcsv",
+                                                "activities": [
+                                                    {
+                                                        "name": "Append for file1",
+                                                        "description": "",
+                                                        "type": "AppendVariable",
+                                                        "dependsOn": [],
+                                                        "userProperties": [],
+                                                        "typeProperties": {
+                                                            "variableName": "pl_var_counter",
+                                                            "value": "1"
+                                                        }
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "If Condition1",
+                        "type": "IfCondition",
+                        "dependsOn": [
+                            {
+                                "activity": "ForEach1",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "expression": {
+                                "value": "@equals(length(variables('pl_var_counter')),3)",
+                                "type": "Expression"
+                            },
+                            "ifFalseActivities": [
+                                {
+                                    "name": "Set fail",
+                                    "type": "SetVariable",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "variableName": "pipelineReturnValue",
+                                        "value": [
+                                            {
+                                                "key": "status",
+                                                "value": {
+                                                    "type": "String",
+                                                    "content": "failed"
+                                                }
+                                            }
+                                        ],
+                                        "setSystemVariable": true
+                                    }
+                                }
+                            ],
+                            "ifTrueActivities": [
+                                {
+                                    "name": "Set success",
+                                    "type": "SetVariable",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "variableName": "pipelineReturnValue",
+                                        "value": [
+                                            {
+                                                "key": "status",
+                                                "value": {
+                                                    "type": "String",
+                                                    "content": "success"
+                                                }
+                                            }
+                                        ],
+                                        "setSystemVariable": true
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "parameters": {
+                    "pl_param_filelist": {
+                        "type": "array"
+                    }
+                },
+                "variables": {
+                    "pl_var_counter": {
+                        "type": "Array"
+                    }
+                },
+                "annotations": []
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/ds_sqldb')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "ls_sqldb",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "ds_param_schema": {
+                        "type": "string"
+                    },
+                    "ds_param_table": {
+                        "type": "string"
+                    }
+                },
+                "annotations": [],
+                "type": "AzureSqlTable",
+                "schema": [],
+                "typeProperties": {
+                    "schema": {
+                        "value": "@dataset().ds_param_schema",
+                        "type": "Expression"
+                    },
+                    "table": {
+                        "value": "@dataset().ds_param_table",
+                        "type": "Expression"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/ls_sqldb')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/ds_adl')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "ls_adl",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "ds_param_container": {
+                        "type": "string"
+                    },
+                    "ds_param_folder": {
+                        "type": "string"
+                    }
+                },
+                "annotations": [],
+                "type": "DelimitedText",
+                "typeProperties": {
+                    "location": {
+                        "type": "AzureBlobFSLocation",
+                        "folderPath": {
+                            "value": "@concat(dataset().ds_param_folder,formatDateTime(utcnow(),'/yyy/MM/dd'))",
+                            "type": "Expression"
+                        },
+                        "fileSystem": {
+                            "value": "@dataset().ds_param_container",
+                            "type": "Expression"
+                        }
+                    },
+                    "columnDelimiter": ",",
+                    "escapeChar": "\\",
+                    "firstRowAsHeader": true,
+                    "quoteChar": "\""
+                },
+                "schema": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/ls_adl')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/ds_blob')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "ls_blob",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "DelimitedText",
+                "typeProperties": {
+                    "location": {
+                        "type": "AzureBlobStorageLocation",
+                        "container": "triggerfiles"
+                    },
+                    "columnDelimiter": ",",
+                    "escapeChar": "\\",
+                    "firstRowAsHeader": true,
+                    "quoteChar": "\""
+                },
+                "schema": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/ls_blob')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/pl_Dataingestion_daily')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Lookup1",
+                        "type": "Lookup",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "AzureSqlSource",
+                                "sqlReaderQuery": "select* from tblconfig where is_active=1",
+                                "queryTimeout": "02:00:00",
+                                "partitionOption": "None"
+                            },
+                            "dataset": {
+                                "referenceName": "ds_sqldb",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "ds_param_schema": "dbo",
+                                    "ds_param_table": "tblconfig"
+                                }
+                            },
+                            "firstRowOnly": false
+                        }
+                    },
+                    {
+                        "name": "ForEach1",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "Lookup1",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('Lookup1').output.value",
+                                "type": "Expression"
+                            },
+                            "isSequential": true,
+                            "activities": [
+                                {
+                                    "name": "Copy data1",
+                                    "type": "Copy",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "source": {
+                                            "type": "AzureSqlSource",
+                                            "queryTimeout": "02:00:00",
+                                            "partitionOption": "None"
+                                        },
+                                        "sink": {
+                                            "type": "DelimitedTextSink",
+                                            "storeSettings": {
+                                                "type": "AzureBlobFSWriteSettings"
+                                            },
+                                            "formatSettings": {
+                                                "type": "DelimitedTextWriteSettings",
+                                                "quoteAllText": true,
+                                                "fileExtension": ".csv"
+                                            }
+                                        },
+                                        "enableStaging": false,
+                                        "translator": {
+                                            "type": "TabularTranslator",
+                                            "typeConversion": true,
+                                            "typeConversionSettings": {
+                                                "allowDataTruncation": true,
+                                                "treatBooleanAsNumber": false
+                                            }
+                                        }
+                                    },
+                                    "inputs": [
+                                        {
+                                            "referenceName": "ds_sqldb",
+                                            "type": "DatasetReference",
+                                            "parameters": {
+                                                "ds_param_schema": {
+                                                    "value": "@item().src_schema",
+                                                    "type": "Expression"
+                                                },
+                                                "ds_param_table": {
+                                                    "value": "@item().src_table",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "outputs": [
+                                        {
+                                            "referenceName": "ds_adl",
+                                            "type": "DatasetReference",
+                                            "parameters": {
+                                                "ds_param_container": {
+                                                    "value": "@item().sink_container",
+                                                    "type": "Expression"
+                                                },
+                                                "ds_param_folder": {
+                                                    "value": "@item().sink_folder",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/ds_sqldb')]",
+                "[concat(variables('factoryId'), '/datasets/ds_adl')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/pl_MultiTrigger_Files')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Until1",
+                        "type": "Until",
+                        "dependsOn": [],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "expression": {
+                                "value": "@variables('pl_var_untilflag')",
+                                "type": "Expression"
+                            },
+                            "activities": [
+                                {
+                                    "name": "Get Metadata1",
+                                    "type": "GetMetadata",
+                                    "dependsOn": [],
+                                    "policy": {
+                                        "timeout": "0.12:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "dataset": {
+                                            "referenceName": "ds_blob",
+                                            "type": "DatasetReference",
+                                            "parameters": {}
+                                        },
+                                        "fieldList": [
+                                            "childItems"
+                                        ],
+                                        "storeSettings": {
+                                            "type": "AzureBlobStorageReadSettings",
+                                            "modifiedDatetimeStart": {
+                                                "value": "@formatDateTime(utcnow(),'yyyy-MM-ddT00:00:00Z')",
+                                                "type": "Expression"
+                                            },
+                                            "modifiedDatetimeEnd": {
+                                                "value": "@formatDateTime(utcnow(),'yyyy-MM-ddT23:59:59Z')",
+                                                "type": "Expression"
+                                            },
+                                            "enablePartitionDiscovery": false
+                                        },
+                                        "formatSettings": {
+                                            "type": "DelimitedTextReadSettings"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Execute FileAvailability",
+                                    "type": "ExecutePipeline",
+                                    "dependsOn": [
+                                        {
+                                            "activity": "Get Metadata1",
+                                            "dependencyConditions": [
+                                                "Succeeded"
+                                            ]
+                                        }
+                                    ],
+                                    "policy": {
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "pipeline": {
+                                            "referenceName": "pl_fileAvailability",
+                                            "type": "PipelineReference"
+                                        },
+                                        "waitOnCompletion": true,
+                                        "parameters": {
+                                            "pl_param_filelist": {
+                                                "value": "@activity('Get Metadata1').output.childItems",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "If Condition1",
+                                    "type": "IfCondition",
+                                    "dependsOn": [
+                                        {
+                                            "activity": "Execute FileAvailability",
+                                            "dependencyConditions": [
+                                                "Succeeded"
+                                            ]
+                                        }
+                                    ],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "expression": {
+                                            "value": "@equals(activity('Execute FileAvailability').output.pipelineReturnValue.status,'success')",
+                                            "type": "Expression"
+                                        },
+                                        "ifFalseActivities": [
+                                            {
+                                                "name": "Wait1",
+                                                "type": "Wait",
+                                                "dependsOn": [],
+                                                "userProperties": [],
+                                                "typeProperties": {
+                                                    "waitTimeInSeconds": 60
+                                                }
+                                            }
+                                        ],
+                                        "ifTrueActivities": [
+                                            {
+                                                "name": "Set variable1",
+                                                "type": "SetVariable",
+                                                "dependsOn": [],
+                                                "policy": {
+                                                    "secureOutput": false,
+                                                    "secureInput": false
+                                                },
+                                                "userProperties": [],
+                                                "typeProperties": {
+                                                    "variableName": "pl_var_untilflag",
+                                                    "value": true
+                                                }
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "name": "execute_dataingestion",
+                                    "type": "ExecutePipeline",
+                                    "dependsOn": [
+                                        {
+                                            "activity": "If Condition1",
+                                            "dependencyConditions": [
+                                                "Succeeded"
+                                            ]
+                                        }
+                                    ],
+                                    "policy": {
+                                        "secureInput": false
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "pipeline": {
+                                            "referenceName": "pl_Dataingestion_daily",
+                                            "type": "PipelineReference"
+                                        },
+                                        "waitOnCompletion": true,
+                                        "parameters": {}
+                                    }
+                                }
+                            ],
+                            "timeout": "0.12:00:00"
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "variables": {
+                    "pl_var_untilflag": {
+                        "type": "Boolean",
+                        "defaultValue": false
+                    }
+                },
+                "annotations": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/ds_blob')]",
+                "[concat(variables('factoryId'), '/pipelines/pl_fileAvailability')]",
+                "[concat(variables('factoryId'), '/pipelines/pl_Dataingestion_daily')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/tr_event')]",
+            "type": "Microsoft.DataFactory/factories/triggers",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "runtimeState": "Started",
+                "pipelines": [
+                    {
+                        "pipelineReference": {
+                            "referenceName": "pl_MultiTrigger_Files",
+                            "type": "PipelineReference"
+                        },
+                        "parameters": {}
+                    }
+                ],
+                "type": "BlobEventsTrigger",
+                "typeProperties": {
+                    "blobPathBeginsWith": "/triggerfiles/blobs/",
+                    "blobPathEndsWith": "job3_completed.csv",
+                    "ignoreEmptyBlobs": false,
+                    "scope": "[parameters('tr_event_properties_typeProperties_scope')]",
+                    "events": [
+                        "Microsoft.Storage.BlobCreated"
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/pl_MultiTrigger_Files')]"
+            ]
+        }
+    ]
+}
