@@ -3,6 +3,14 @@
 This repository demonstrates a model solution for orchestrating data ingestion when multiple upstream sources deliver data at different times and with unpredictable processing durations.
 Instead of relying on a fixed schedule, the pipelines use trigger-file–based orchestration to determine when all upstream data is ready for ingestion.
 
+*Event Trigger*
+
+The solution uses an event-based trigger on Azure Blob Storage to start the ingestion process automatically. The trigger monitors for files whose names end with job3_completed.csv.
+
+	•	When this file arrives, the pipeline execution begins.
+	•	The pipeline will only succeed if all required upstream files are present, even after the trigger fires.
+	•	This ensures data integrity, preventing incomplete ingestion when dependent files are missing.
+
 
 *Pipeline Architecture*
 
